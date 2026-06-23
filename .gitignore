@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Google Service Account credentials (NEVER commit this!)
+config/google-credentials.json
+
+# Environment variables
+.env
+
+# Multer temp uploads
+uploads/
+
+# Logs
+*.log
