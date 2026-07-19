@@ -90,37 +90,39 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`\n╔══════════════════════════════════════════════════╗`);
-  console.log(`║  UniBuddy Backend — Google Drive Upload API      ║`);
-  console.log(`║  Server running on http://localhost:${PORT}          ║`);
-  console.log(`╚══════════════════════════════════════════════════╝\n`);
+// Start server only when not running on Netlify serverless functions
+if (!process.env.NETLIFY) {
+  app.listen(PORT, () => {
+    console.log(`\n╔══════════════════════════════════════════════════╗`);
+    console.log(`║  UniBuddy Backend — Google Drive Upload API      ║`);
+    console.log(`║  Server running on http://localhost:${PORT}          ║`);
+    console.log(`╚══════════════════════════════════════════════════╝\n`);
 
-  // Configuration status checks
-  const credentialsPath = path.join(__dirname, "config", "google-credentials.json");
-  if (!fs.existsSync(credentialsPath)) {
-    console.warn("⚠️  WARNING: config/google-credentials.json not found!");
-    console.warn("   Place your Google Service Account JSON key there.\n");
-  } else {
-    console.log("✅ Google credentials file found.");
-  }
+    // Configuration status checks
+    const credentialsPath = path.join(__dirname, "config", "google-credentials.json");
+    if (!fs.existsSync(credentialsPath)) {
+      console.warn("⚠️  WARNING: config/google-credentials.json not found!");
+      console.warn("   Place your Google Service Account JSON key there.\n");
+    } else {
+      console.log("✅ Google credentials file found.");
+    }
 
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!folderId || folderId === "YOUR_FOLDER_ID_HERE") {
-    console.warn("⚠️  WARNING: GOOGLE_DRIVE_FOLDER_ID not set in .env!");
-    console.warn("   Set your target Google Drive folder ID.\n");
-  } else {
-    console.log(`✅ Google Drive folder ID: ${folderId}`);
-  }
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (!folderId || folderId === "YOUR_FOLDER_ID_HERE") {
+      console.warn("⚠️  WARNING: GOOGLE_DRIVE_FOLDER_ID not set in .env!");
+      console.warn("   Set your target Google Drive folder ID.\n");
+    } else {
+      console.log(`✅ Google Drive folder ID: ${folderId}`);
+    }
 
-  if (process.env.FIREBASE_DB_URL) {
-    console.log(`✅ Firebase DB URL: ${process.env.FIREBASE_DB_URL}`);
-  } else {
-    console.warn("⚠️  WARNING: FIREBASE_DB_URL not set in .env!\n");
-  }
+    if (process.env.FIREBASE_DB_URL) {
+      console.log(`✅ Firebase DB URL: ${process.env.FIREBASE_DB_URL}`);
+    } else {
+      console.warn("⚠️  WARNING: FIREBASE_DB_URL not set in .env!\n");
+    }
 
-  console.log("");
-});
+    console.log("");
+  });
+}
 
 module.exports = app;
