@@ -1,3 +1,15 @@
+/**
+ * Upload Controller
+ * 
+ * Handles the file upload workflow:
+ * 1. Receives multipart form data (PDF file + note metadata)
+ * 2. Uploads the file to Google Drive
+ * 3. Sets public read permission
+ * 4. Generates direct download link
+ * 5. Saves the note record to Firebase Realtime Database
+ * 6. Cleans up temp file
+ */
+
 const {
   uploadFileToDrive,
   setPublicPermission,
@@ -5,15 +17,26 @@ const {
   deleteLocalTempFile
 } = require("../helpers/googleDrive");
 
+/**
+ * Saves a note record to Firebase Realtime Database.
+ * Updates the 'notes' array by fetching existing notes, prepending the new one,
+ * and writing back the full array.
+ * 
+ * @param {object} noteData - The note record to save
+ * @param {string} firebaseUrl - Firebase RTDB base URL
+ * @returns {Promise<boolean>} Success status
+ */
 async function saveNoteToFirebase(noteData, firebaseUrl) {
   if (!firebaseUrl) {
     console.warn("[Firebase] No Firebase URL configured. Skipping cloud save.");
     return false;
   }
 
+  // Ensure trailing slash
   const baseUrl = firebaseUrl.endsWith("/") ? firebaseUrl : firebaseUrl + "/";
 
   try {
+    // Fetch existing notes from Firebase
     const response = await fetch(`${baseUrl}unibuddy/notes.json`, {
       cache: "no-store"
     });
@@ -25,8 +48,10 @@ async function saveNoteToFirebase(noteData, firebaseUrl) {
       }
     }
 
+    // Prepend the new note at the beginning
     existingNotes.unshift(noteData);
 
+    // Write back the full notes array
     const putResponse = await fetch(`${baseUrl}unibuddy/notes.json`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -46,6 +71,13 @@ async function saveNoteToFirebase(noteData, firebaseUrl) {
   }
 }
 
+/**
+ * Updates user points in Firebase Realtime Database.
+ * 
+ * @param {string} userEmail - Email of the user to reward
+ * @param {number} points - Points to add
+ * @param {string} firebaseUrl - Firebase RTDB base URL
+ */
 async function updateUserPointsInFirebase(userEmail, points, firebaseUrl) {
   if (!firebaseUrl) return;
 
@@ -79,6 +111,14 @@ async function updateUserPointsInFirebase(userEmail, points, firebaseUrl) {
   }
 }
 
+/**
+ * Main upload handler — called by the Express route.
+ * 
+ * Expected form fields:
+ * - pdfFile (file): The PDF document
+ * - title, subject, description, faculty, year, batch, tags, noteStyle (text fields)
+ * - uploaderEmail, uploaderName (text fields): Current user info from frontend
+ */
 async function handleUpload(req, res) {
   const file = req.file;
 
@@ -89,6 +129,7 @@ async function handleUpload(req, res) {
     });
   }
 
+  // Extract metadata from form fields
   const {
     title,
     subject,
@@ -98,10 +139,12 @@ async function handleUpload(req, res) {
     batch,
     tags,
     noteStyle,
+    noteType,
     uploaderEmail,
     uploaderName
   } = req.body;
 
+  // Validate required fields
   if (!title || !subject || !uploaderEmail) {
     deleteLocalTempFile(file.path);
     return res.status(400).json({
@@ -109,6 +152,9 @@ async function handleUpload(req, res) {
       message: "Missing required fields: title, subject, uploaderEmail"
     });
   }
+
+  const allowedNoteTypes = ["full", "short", "mindmap"];
+  const validatedNoteType = allowedNoteTypes.includes(noteType) ? noteType : "full";
 
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   if (!folderId || folderId === "YOUR_FOLDER_ID_HERE") {
@@ -123,6 +169,7 @@ async function handleUpload(req, res) {
     console.log(`\n[Upload] Processing: "${title}" by ${uploaderName} (${uploaderEmail})`);
     console.log(`[Upload] File: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
+    // Step 1: Upload to Google Drive
     console.log("[Upload] Step 1/3: Uploading to Google Drive...");
     const { fileId } = await uploadFileToDrive(
       file.path,
@@ -131,12 +178,15 @@ async function handleUpload(req, res) {
       folderId
     );
 
+    // Step 2: Set public read permission
     console.log("[Upload] Step 2/3: Setting public permissions...");
     await setPublicPermission(fileId);
 
+    // Step 3: Generate direct download link
     const directDownloadUrl = getDirectDownloadLink(fileId);
     console.log(`[Upload] Step 3/3: Direct download link: ${directDownloadUrl}`);
 
+    // Build the note record (matching the UniBuddy frontend note schema)
     const noteId = `note-${Date.now()}`;
     const noteRecord = {
       id: noteId,
@@ -149,6 +199,7 @@ async function handleUpload(req, res) {
       tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       fileUrl: directDownloadUrl,
       fileType: noteStyle || "typed",
+      noteType: validatedNoteType,
       fileDataUrl: "",
       driveDownloadUrl: directDownloadUrl,
       driveFileId: fileId,
@@ -172,13 +223,16 @@ async function handleUpload(req, res) {
       `
     };
 
+    // Save to Firebase Realtime Database
     const firebaseUrl = process.env.FIREBASE_DB_URL;
     const savedToFirebase = await saveNoteToFirebase(noteRecord, firebaseUrl);
 
+    // Award uploader +15 UniCredits
     if (savedToFirebase) {
       await updateUserPointsInFirebase(uploaderEmail, 15, firebaseUrl);
     }
 
+    // Clean up temp file
     deleteLocalTempFile(file.path);
 
     console.log(`[Upload] ✅ Complete! Note ID: ${noteId}\n`);
