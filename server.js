@@ -25,6 +25,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS — Allow requests from UniBuddy frontend origins
+// CORS — Allow requests from UniBuddy frontend origins
 app.use(
   cors({
     origin: [
@@ -33,12 +34,15 @@ app.use(
       "http://127.0.0.1:8001",
       "http://127.0.0.1:5500",
       "https://unibuddy-72ef1.web.app",  // Firebase Hosting production
-      "https://unibuddy-72ef1.firebaseapp.com"
+      "https://unibuddy-72ef1.firebaseapp.com",
+      "https://unibuddylk.web.app",
+      "https://unibuddylk.firebaseapp.com"
     ],
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"]
   })
 );
+
 
 // Parse JSON bodies (for non-file routes)
 app.use(express.json());
