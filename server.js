@@ -122,3 +122,5 @@ app.listen(PORT, () => {
 
   console.log("");
 });
+
+module.exports = app;
