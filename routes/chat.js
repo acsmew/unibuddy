@@ -2,6 +2,27 @@ const express = require("express");
 const router = express.Router();
 const https = require("https");
 
+router.get("/models", async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "API key not set" });
+  
+  try {
+    const apiRequest = () => {
+      return new Promise((resolve, reject) => {
+        https.get(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`, (resApi) => {
+          let data = "";
+          resApi.on("data", (chunk) => data += chunk);
+          resApi.on("end", () => resolve({ statusCode: resApi.statusCode, body: data }));
+        }).on("error", reject);
+      });
+    };
+    const { statusCode, body } = await apiRequest();
+    res.status(statusCode).send(body);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/", async (req, res) => {
   const { message, history } = req.body;
   if (!message) {
