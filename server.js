@@ -20,11 +20,12 @@ const path = require("path");
 const fs = require("fs");
 
 const uploadRoutes = require("./routes/upload");
+const chatRoutes = require("./routes/chat");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS — Allow requests from UniBuddy frontend origins
+
 // CORS — Allow requests from UniBuddy frontend origins
 app.use(
   cors({
@@ -42,7 +43,6 @@ app.use(
     allowedHeaders: ["Content-Type"]
   })
 );
-
 
 // Parse JSON bodies (for non-file routes)
 app.use(express.json());
@@ -78,6 +78,7 @@ app.get("/api/health", (req, res) => {
 
 // Mount upload route
 app.use("/api/upload", uploadRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
