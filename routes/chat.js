@@ -69,17 +69,7 @@ router.post("/", async (req, res) => {
 
     const postData = JSON.stringify({ contents });
 
-    const options = {
-      hostname: "generativelanguage.googleapis.com",
-      path: `/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(postData)
-      }
-    };
-
-    const apiRequest = () => {
+    const apiRequest = (options, payload) => {
       return new Promise((resolve, reject) => {
         const reqApi = https.request(options, (resApi) => {
           let data = "";
@@ -95,24 +85,47 @@ router.post("/", async (req, res) => {
           reject(e);
         });
 
-        reqApi.write(postData);
+        reqApi.write(payload);
         reqApi.end();
       });
     };
 
-    const { statusCode, body } = await apiRequest();
-    const data = JSON.parse(body);
+    // List of models to try sequentially in case of quota limits
+    const models = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-3.5-flash"];
+    let lastError = "";
 
-    if (statusCode === 200 && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
-      const reply = data.candidates[0].content.parts[0].text;
-      return res.json({ success: true, reply });
-    } else {
-      console.error("Gemini API Error status:", statusCode, "details:", body);
-      return res.status(500).json({ 
-        success: false, 
-        message: data.error?.message || "Invalid response format from Gemini API." 
-      });
+    for (const model of models) {
+      try {
+        const options = {
+          hostname: "generativelanguage.googleapis.com",
+          path: `/v1/models/${model}:generateContent?key=${apiKey}`,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(postData)
+          }
+        };
+
+        const { statusCode, body } = await apiRequest(options, postData);
+        const data = JSON.parse(body);
+
+        if (statusCode === 200 && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
+          const reply = data.candidates[0].content.parts[0].text;
+          return res.json({ success: true, reply });
+        } else {
+          lastError = data.error?.message || "HTTP status " + statusCode;
+          console.warn(`Model ${model} failed with: ${lastError}`);
+        }
+      } catch (err) {
+        lastError = err.message;
+        console.warn(`Model ${model} request threw: ${lastError}`);
+      }
     }
+
+    return res.status(500).json({ 
+      success: false, 
+      message: "All Gemini models returned rate limits or errors. Last error: " + lastError 
+    });
   } catch (error) {
     console.error("Chatbot proxy error: ", error);
     return res.status(500).json({ success: false, message: "Failed to connect to Gemini AI: " + error.message });
