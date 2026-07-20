@@ -19,7 +19,18 @@ router.post("/", async (req, res) => {
   try {
     const contents = [];
     
-    // Convert history format to Gemini role standards
+    // Inject system instructions as pre-defined chat priming to ensure 100% API compatibility across all versions
+    contents.push({
+      role: "user",
+      parts: [{ text: "System Instructions: You are UniBuddy AI, a friendly academic helper on the UniBuddy Note Sharing Platform for university students. In addition to answering general questions about any topic in the world, you can help students find lecture notes. If they ask about notes, guide them to write 'search' in the chat bubble so they can view note links dynamically. Keep your answers brief, engaging, helpful, and formatted in clean markdown. Speak politely." }]
+    });
+    
+    contents.push({
+      role: "model",
+      parts: [{ text: "Understood. I am UniBuddy AI. I will assist students with general questions, note searching guidelines, and platform features in a polite, helpful manner." }]
+    });
+    
+    // Append message history memory
     if (history && Array.isArray(history)) {
       history.forEach(item => {
         contents.push({
@@ -29,17 +40,13 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // Append the active user query
     contents.push({
       role: "user",
       parts: [{ text: message }]
     });
 
-    const postData = JSON.stringify({
-      contents,
-      system_instruction: {
-        parts: [{ text: "You are UniBuddy AI, a friendly academic helper on the UniBuddy Note Sharing Platform for university students. In addition to answering general questions about any topic in the world, you can help students find lecture notes. If they ask about notes, guide them to write 'search' in the chat bubble so they can view note links dynamically. Keep your answers brief, engaging, helpful, and formatted in clean markdown. Speak politely." }]
-      }
-    });
+    const postData = JSON.stringify({ contents });
 
     const options = {
       hostname: "generativelanguage.googleapis.com",
